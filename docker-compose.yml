@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 services:
   backend:
     restart: always
@@ -20,7 +20,5 @@ services:
       dockerfile: Dockerfile.frontend
     ports:
       - "3000:3000"
-    depends_on:
-      - backend
     volumes:
       - ./frontend:/app
