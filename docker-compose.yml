@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  backend:
+    restart: always
+    container_name: backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    environment:
+      DEBUG: 1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+  frontend:
+    restart: always
+    container_name: frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
