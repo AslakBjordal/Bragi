@@ -1,0 +1,8 @@
+Similarity score between fasit and tiny: 0.9846973735643797
+Similarity score between fasit and base: 0.9888565403219943
+Similarity score between fasit and small: 0.9958776355791975
+Similarity score between fasit and medium: 0.9968132422795538
+Similarity score between fasit and large: 0.9875699646822457
+Similarity score between fasit and large-v2: 0.9961394317092543
+Similarity score between fasit and large-v3: 0.9921587385677827
+Similarity score between fasit and small_chunk: 0.9857605948424373

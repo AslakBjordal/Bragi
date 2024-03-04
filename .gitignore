@@ -50,6 +50,12 @@ docs/_build/
 # ignore all .env files
 .env*
 
+# ignore srt files
+*.srt
+
+
+
+
 #           Frontend
 # Build and Release Folders
 bin-debug/
