@@ -1,0 +1,12 @@
+{
+	"name": "Bragi",
+	"description": "A browser extension made with Svelte Kit",
+	"version": "1.0.0",
+	"manifest_version": 3,
+	"permissions": ["activeTab", "scripting", "tabs"],
+	"action": {
+		"default_title": "Svelte Extension",
+		"default_icon": "favicon.png",
+		"default_popup": "index.html"
+	}
+}
