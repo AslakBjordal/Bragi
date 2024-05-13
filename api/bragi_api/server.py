@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from enum import Enum
+from threading import Lock
 from typing import Optional
 
 import yt_dlp
@@ -16,6 +17,7 @@ logging.getLogger("faster_whisper").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 model = WhisperModel("medium", device="cpu", compute_type="int8")
+lock = Lock()
 
 
 class Action(str, Enum):
@@ -63,6 +65,28 @@ def blocking_youtube_download(youtube_id: str, data_dir: str):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([f"https://www.youtube.com/watch?v={youtube_id}"])
 
+def blocking_transcribe(audio_path: str, video_id: int, db):
+    segments, _ = model.transcribe(
+        audio_path,
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=500)
+    )
+    for segment in segments:
+        lock.acquire()
+        cur = db.cursor()
+        cur.execute(
+            "INSERT INTO segments (video_id, start_time, end_time, text) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+            (video_id, segment.start, segment.end, segment.text))
+        db.commit()
+        lock.release()
+
+    # Set the state to success
+    lock.acquire()
+    cur = db.cursor()
+    cur.execute("UPDATE videos SET state = ? WHERE id = ?", (State.SUCCESS, video_id))
+    db.commit()
+    lock.release()
+
 
 async def transcribe_background(data_dir: str, video_id: int,
     websocket: WebSocket,
@@ -74,17 +98,7 @@ async def transcribe_background(data_dir: str, video_id: int,
         await asyncio.create_task(asyncio.to_thread(
             blocking_youtube_download, msg.youtube_id, data_dir))
 
-    segments, _ = model.transcribe(
-        audio_path,
-        vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=500)
-    )
-    for segment in segments:
-        cur = websocket.app.db.cursor()
-        cur.execute(
-            "INSERT INTO segments (video_id, start_time, end_time, text) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
-            (video_id, segment.start, segment.end, segment.text))
-        websocket.app.db.commit()
+    asyncio.create_task(asyncio.to_thread(blocking_transcribe, audio_path, video_id, websocket.app.db))
 
 
 async def start_transcription(websocket: WebSocket, data: WebsocketMessage):
@@ -110,8 +124,6 @@ async def start_transcription(websocket: WebSocket, data: WebsocketMessage):
             if state == State.SUCCESS:
                 found = True
                 break
-            elif state == State.ERROR:
-                break
             else:
                 break
         else:
@@ -119,10 +131,33 @@ async def start_transcription(websocket: WebSocket, data: WebsocketMessage):
 
     # Pass off to a background job then return
     if not found:
-        cur.execute("INSERT INTO videos (youtube_id, state) VALUES (?, ?)",
-                    (data.youtube_id, State.TRANSCRIBING))
-        websocket.app.db.commit()
-        video_id = cur.lastrowid
+        # Check if it already exists
+        cur = websocket.app.db.cursor()
+        cur.execute("SELECT id, state FROM videos WHERE youtube_id = ?", (data.youtube_id,))
+        row = cur.fetchone()
+        video_id = None
+        if not row:
+            lock.acquire()
+            cur.execute("INSERT INTO videos (youtube_id, state) VALUES (?, ?)",
+                        (data.youtube_id, State.TRANSCRIBING))
+            websocket.app.db.commit()
+            video_id = cur.lastrowid
+            lock.release()
+        else:
+            video_id = row[0]
+
+            # Set the state to transcribing
+            if State(row[1]) == State.SUCCESS:
+                await websocket.send_json(
+                    WebsocketMessage(action=Action.ERROR,
+                                     error="Transcription already exists").dict(
+                        exclude_none=True))
+                return
+            lock.acquire()
+            cur = websocket.app.db.cursor()
+            cur.execute("UPDATE videos SET state = ? WHERE id = ?", (State.TRANSCRIBING, video_id))
+            websocket.app.db.commit()
+            lock.release()
         asyncio.create_task(
             transcribe_background(websocket.app.data_dir, video_id, websocket,
                                   data))
@@ -145,10 +180,14 @@ async def stream_segments(websocket: WebSocket, data: WebsocketMessage):
                 (data.youtube_id,))
     row = cur.fetchone()
     if not row:
-        await websocket.send_json(WebsocketMessage(action=Action.ERROR,
-                                                   error="youtube_id not found").dict(
-            exclude_none=True))
-        return
+        asyncio.ensure_future(start_transcription(websocket, data))
+        while True:
+            cur.execute("SELECT id FROM videos WHERE youtube_id = ?", (data.youtube_id,))
+            row = cur.fetchone()
+            if row:
+                break
+            await asyncio.sleep(1)
+
     video_id = row[0]
     logger.info(f"Streaming segments for video_id: {video_id}")
 

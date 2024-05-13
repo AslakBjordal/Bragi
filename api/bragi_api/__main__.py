@@ -26,7 +26,8 @@ async def lifespan(app: FastAPI):
 
     app.data_dir = args.data_dir
 
-    con = sqlite3.connect(args.sqlite_path)
+    # check_same_thread=False is usually unsafe, but we're going to guard writes with a lock
+    con = sqlite3.connect(args.sqlite_path, check_same_thread=False)
 
     # Create tables if they don't exist
     con.executescript(
