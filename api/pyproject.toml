@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "bragi-api"
+version = "0.1.0"
+description = ""
+authors = ["Mustafa Gezen <mustafa@gezen.no>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.110.2"
+faster-whisper = "^1.0.1"
+uvicorn = "^0.29.0"
+websockets = "^12.0"
+yt-dlp = "^2024.4.9"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
