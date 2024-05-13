@@ -1,17 +1,17 @@
 version: "3.8"
 services:
-  backend:
-    restart: always
-    container_name: backend
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.backend
-    environment:
-      DEBUG: 1
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend:/app
+  # backend:
+  #   restart: always
+  #   container_name: backend
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile.backend
+  #   environment:
+  #     DEBUG: 1
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./backend:/app
   frontend:
     restart: always
     container_name: frontend
@@ -20,5 +20,5 @@ services:
       dockerfile: Dockerfile.frontend
     ports:
       - "4173:4173"
-    volumes:
-      - ./frontend:/app
+    # volumes:
+    #   - ./frontend:/app       
