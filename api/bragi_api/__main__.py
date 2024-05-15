@@ -108,7 +108,10 @@ async def authenticated(request: Request, call_next):
 
     token = request.headers.get("authorization")
     if not token:
-        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+        token = request.cookies.get("token")
+        if not token:
+            return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+        token = f"Bearer {token}"
 
     if not token.startswith("Bearer "):
         return JSONResponse(status_code=401, content={"error": "Unauthorized"})
@@ -118,6 +121,8 @@ async def authenticated(request: Request, call_next):
     user = await asyncio.to_thread(blocking_check, app.db, token)
     if not user:
         return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    request.state.user = user
 
     return await call_next(request)
 

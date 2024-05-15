@@ -12,22 +12,37 @@
     Tab,
     TabContent,
   } from 'carbon-components-svelte';
+  import { sendRequest } from '../utils';
+  import { redirect } from '@sveltejs/kit';
+  import { onMount } from 'svelte';
 
   let email = '';
-  let username = '';
   let password = '';
   let repeatPassword = '';
 
   interface UserCredentials {
-    username: string;
+    email: string;
     password: string;
-    email?: string;
   }
 
-  function handleLogin(event: Event) {
+  // Check if user already signed in
+  onMount(async () => {
+    const res = await sendRequest('GET', '/me');
+    console.log(res);
+    if (res.id) {
+      window.location.href = '/youtubetranscribe';
+    }
+  });
+
+  async function handleLogin(event: Event) {
     event.preventDefault();
-    console.log('Attempting login...', { username, password });
-    // Implement actual login logic here
+
+    const res = await sendRequest('POST', '/users:login', { email, password });
+    if (res.error) {
+      console.error('Error logging in:', res.error);
+    } else {
+      window.location.href = '/youtubetranscribe';
+    }
   }
 
   $: passwordsMatch = password === repeatPassword;
@@ -38,7 +53,7 @@
       console.log('Passwords do not match.');
       return; // Prevent the form from submitting
     }
-    console.log('Registering user...', { username, email, password });
+    console.log('Registering user...', { email, password });
     // Implement registration logic here
   }
 
@@ -59,9 +74,9 @@
           <TabContent>
             <FluidForm>
               <TextInput
-                bind:value={username}
-                labelText="Username"
-                placeholder="Enter user name..."
+                bind:value={email}
+                labelText="Email"
+                placeholder="Enter email..."
                 required
               />
               <PasswordInput
@@ -81,12 +96,6 @@
 
           <TabContent>
             <FluidForm>
-              <TextInput
-                bind:value={username}
-                labelText="Username"
-                placeholder="Enter user name..."
-                required
-              />
               <TextInput
                 bind:value={email}
                 labelText="Email"
