@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 from enum import Enum
-from threading import Lock
 from typing import Optional
 
 import yt_dlp
@@ -11,13 +10,14 @@ from faster_whisper import WhisperModel
 from pydantic import BaseModel
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
+from bragi_api.common import lock
+
 router = APIRouter()
 logging.basicConfig()
 logging.getLogger("faster_whisper").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 model = WhisperModel("medium", device="cpu", compute_type="int8")
-lock = Lock()
 
 
 class Action(str, Enum):
@@ -241,4 +241,3 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         if stream_task and (not stream_task.done() or stream_task.cancelled()):
             stream_task.cancel()
-            stream_task = None
