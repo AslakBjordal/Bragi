@@ -5,6 +5,7 @@ import bcrypt
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette.requests import Request
+from starlette.responses import Response
 
 from bragi_api.common import lock
 
@@ -19,6 +20,13 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class Me(BaseModel):
+    id: int
+    email: str
+
+@router.get("/me")
+def get_me(request: Request):
+    return Me(id=request.state.user[0], email=request.state.user[1])
 
 @router.post("/users", status_code=201)
 def sign_up(params: SignUpRequest, request: Request):
@@ -34,7 +42,7 @@ def sign_up(params: SignUpRequest, request: Request):
     return {}
 
 @router.post("/users:login")
-def sign_in(params: LoginRequest, request: Request):
+def sign_in(params: LoginRequest, request: Request, response: Response):
     cur = request.app.db.cursor()
     cur.execute("SELECT id, password_hash FROM users WHERE email = ?",
                 (params.email,))
@@ -52,5 +60,8 @@ def sign_in(params: LoginRequest, request: Request):
                 (user_id, new_token, int(time.time()) + 60 * 60 * 24 * 7))
     request.app.db.commit()
     lock.release()
+
+    # Not really ideal, but just for simplicity
+    response.set_cookie("token", new_token, httponly=True, max_age=60 * 60 * 24 * 7)
 
     return {"token": new_token}
