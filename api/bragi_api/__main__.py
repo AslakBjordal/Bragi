@@ -1,13 +1,20 @@
 import argparse
+import asyncio
 import sqlite3
+import time
 from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
+from bragi_api import users
+from bragi_api.common import lock
 from bragi_api.server import router
 
 
+# noinspection SqlNoDataSourceInspection
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     parser = argparse.ArgumentParser(description="Bragi API")
@@ -32,6 +39,20 @@ async def lifespan(app: FastAPI):
     # Create tables if they don't exist
     con.executescript(
         """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            email TEXT NOT NULL,
+            password_hash TEXT
+        );
+        
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            token TEXT,
+            expires_at INTEGER,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        
         CREATE TABLE IF NOT EXISTS videos (
             id INTEGER PRIMARY KEY,
             youtube_id TEXT,
@@ -65,6 +86,41 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
+app.include_router(users.router)
+
+
+def blocking_check(db: sqlite3.Connection, token: str) -> dict:
+    lock.acquire()
+    cur = db.cursor()
+    cur.execute(
+        "SELECT u.* FROM sessions s INNER JOIN users u on u.id = s.user_id WHERE token = ? AND expires_at > ?",
+        (token, int(time.time())))
+    row = cur.fetchone()
+    lock.release()
+    return row
+
+
+@app.middleware("http")
+async def authenticated(request: Request, call_next):
+    match (request.method, request.url.path):
+        case ("POST", "/users") | ("POST", "/users:login"):
+            return await call_next(request)
+
+    token = request.headers.get("authorization")
+    if not token:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    if not token.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    token = token.split(" ")[1]
+
+    user = await asyncio.to_thread(blocking_check, app.db, token)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    return await call_next(request)
+
 
 if __name__ == "__main__":
     uvicorn.run("bragi_api.__main__:app", reload=True)
