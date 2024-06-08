@@ -3,6 +3,7 @@
 	let runCaptions = false;
 	let captions = '';
 	let timerValue = '';
+
 	async function getUrl() {
 		const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 		url = tab.url ?? '';
@@ -25,9 +26,37 @@
 	function getCurrentTime() {
 		return document.querySelector('video')?.currentTime;
 	}
+	async function getCaptions() {
+		const socket = new WebSocket('ws://localhost:8000');
+		document.querySelector('video')?.addEventListener('seeking', () => {
+			socket.send(
+				JSON.stringify({
+					action: 'stream-segments',
+					youtube_id: new URL(url).searchParams.get('v'),
+					segment_start_time: getCurrentTime()
+				})
+			);
+		});
+
+		socket.addEventListener('open', () => {
+			socket.send(
+				JSON.stringify({
+					action: 'stream-segments',
+					youtube_id: new URL(url).searchParams.get('v'),
+					segment_start_time: getCurrentTime()
+				})
+			);
+			socket.addEventListener('message', (event) => {
+				const data = JSON.parse(event.data);
+				if (data.action === 'stream_segments') {
+					captions = data.segment_text;
+				}
+			});
+		});
+	}
 
 	if (runCaptions) {
-		captions = 'UseAPI and get captions';
+		getCaptions();
 	}
 </script>
 
@@ -36,8 +65,8 @@
 {#if url != ''}
 	<div>
 		Current url is {url}
-		{#if timerValue}
-			<div>Current progress in video {timerValue}</div>
+		{#if runCaptions}
+			<div>{captions}</div>
 		{/if}
 	</div>
 {/if}
