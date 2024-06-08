@@ -45,6 +45,9 @@ class WebsocketMessage(BaseModel):
     youtube_id: Optional[str] = None
     custom_url: Optional[str] = None
 
+    # Language
+    language: Optional[str] = "en"
+
     # Stream segments
     segment_start_time: Optional[float] = None
     segment_end_time: Optional[float] = None
@@ -67,18 +70,19 @@ def blocking_youtube_download(youtube_id: str, data_dir: str):
         ydl.download([f"https://www.youtube.com/watch?v={youtube_id}"])
 
 
-def blocking_transcribe(audio_path: str, video_id: int, db):
+def blocking_transcribe(audio_path: str, video_id: int, language: str, db):
     segments, _ = model.transcribe(
         audio_path,
         vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=500)
+        vad_parameters=dict(min_silence_duration_ms=500),
+        language=language,
     )
     for segment in segments:
         lock.acquire()
         cur = db.cursor()
         cur.execute(
-            "INSERT INTO segments (video_id, start_time, end_time, text) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
-            (video_id, segment.start, segment.end, segment.text))
+            "INSERT INTO segments (video_id, start_time, end_time, text, language) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+            (video_id, segment.start, segment.end, segment.text, language))
         db.commit()
         lock.release()
 
@@ -91,7 +95,8 @@ def blocking_transcribe(audio_path: str, video_id: int, db):
     lock.release()
 
 
-async def transcribe_background(data_dir: str, video_id: int, custom_url: Optional[str],
+async def transcribe_background(data_dir: str, video_id: int,
+    custom_url: Optional[str],
     websocket: WebSocket,
     msg: WebsocketMessage):
     audio_path = f"{data_dir}/{msg.youtube_id}.webm" if not custom_url else f"{data_dir}/{custom_url}.mp4"
@@ -113,6 +118,7 @@ async def transcribe_background(data_dir: str, video_id: int, custom_url: Option
 
     asyncio.create_task(
         asyncio.to_thread(blocking_transcribe, audio_path, video_id,
+                          msg.language,
                           websocket.app.db))
 
 
@@ -150,16 +156,17 @@ async def start_transcription(websocket: WebSocket, data: WebsocketMessage):
         # Check if it already exists
         cur = websocket.app.db.cursor()
         cur.execute(
-            "SELECT id, state, custom_url FROM videos WHERE youtube_id = ? OR custom_url = ?",
-            (data.youtube_id, data.custom_url))
+            "SELECT id, state, custom_url FROM videos WHERE (youtube_id = ? OR custom_url = ?) AND language = ?",
+            (data.youtube_id, data.custom_url, data.language))
         row = cur.fetchone()
         video_id = None
         custom_url = None
         if not row:
             lock.acquire()
             cur.execute(
-                "INSERT INTO videos (youtube_id, custom_url, state) VALUES (?, ?, ?)",
-                (data.youtube_id, data.custom_url, State.TRANSCRIBING))
+                "INSERT INTO videos (youtube_id, custom_url, state, language) VALUES (?, ?, ?, ?)",
+                (data.youtube_id, data.custom_url, State.TRANSCRIBING,
+                 data.language))
             websocket.app.db.commit()
             video_id = cur.lastrowid
             custom_url = data.custom_url
@@ -189,7 +196,8 @@ async def start_transcription(websocket: WebSocket, data: WebsocketMessage):
     await websocket.send_json(
         WebsocketMessage(action=Action.START_TRANSCRIPTION,
                          youtube_id=data.youtube_id,
-                         custom_url=data.custom_url).dict(exclude_none=True))
+                         custom_url=data.custom_url,
+                         language=data.language).dict(exclude_none=True))
 
 
 async def stream_segments(websocket: WebSocket, data: WebsocketMessage):
@@ -201,14 +209,15 @@ async def stream_segments(websocket: WebSocket, data: WebsocketMessage):
 
     # Check if a video id is present
     cur = websocket.app.db.cursor()
-    cur.execute("SELECT id FROM videos WHERE youtube_id = ? OR custom_url = ?",
-                (data.youtube_id, data.custom_url))
+    cur.execute("SELECT id FROM videos WHERE (youtube_id = ? OR custom_url = ?) AND language = ?",
+                (data.youtube_id, data.custom_url, data.language))
     row = cur.fetchone()
     if not row:
         asyncio.ensure_future(start_transcription(websocket, data))
         while True:
-            cur.execute("SELECT id FROM videos WHERE youtube_id = ? OR custom_url = ?",
-                        (data.youtube_id, data.custom_url))
+            cur.execute(
+                "SELECT id FROM videos WHERE (youtube_id = ? OR custom_url = ?) AND language = ?",
+                (data.youtube_id, data.custom_url, data.language))
             row = cur.fetchone()
             if row:
                 break
@@ -222,8 +231,8 @@ async def stream_segments(websocket: WebSocket, data: WebsocketMessage):
 
         cur = websocket.app.db.cursor()
         cur.execute(
-            "SELECT start_time, end_time, text FROM segments WHERE video_id = ? AND start_time >= ? ORDER BY start_time LIMIT 1",
-            (video_id, current_time))
+            "SELECT start_time, end_time, text FROM segments WHERE video_id = ? AND start_time >= ? AND language = ? ORDER BY start_time LIMIT 1",
+            (video_id, current_time, data.language))
         row = cur.fetchone()
         if row:
             await websocket.send_json(
