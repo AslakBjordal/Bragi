@@ -3,7 +3,7 @@
 	let runCaptions = false;
 	let captions = '';
 	let timerValue = '';
-
+	let socket: WebSocket | null = null;
 	async function getUrl() {
 		const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 		url = tab.url ?? '';
@@ -20,18 +20,28 @@
 				});
 		}
 	}
-	function activateCaptions() {
+	async function activateCaptions() {
 		runCaptions = !runCaptions;
+		await getUrl();
+		if (runCaptions) {
+			getCaptions();
+		} else {
+			socket?.close();
+			socket = null;
+		}
 	}
 	function getCurrentTime() {
 		return document.querySelector('video')?.currentTime;
 	}
 	async function getCaptions() {
-		const socket = new WebSocket('ws://localhost:8000');
+		if (!socket) {
+			socket = new WebSocket('ws://localhost:8000/ws');
+		}
+		document.cookie = 'token=e0883e8800135317bbf396c80876c113c6e955cc526bf17635100b21d569; path=/';
 		document.querySelector('video')?.addEventListener('seeking', () => {
-			socket.send(
+			socket?.send(
 				JSON.stringify({
-					action: 'stream-segments',
+					action: 'stream_segments',
 					youtube_id: new URL(url).searchParams.get('v'),
 					segment_start_time: getCurrentTime()
 				})
@@ -39,14 +49,14 @@
 		});
 
 		socket.addEventListener('open', () => {
-			socket.send(
+			socket?.send(
 				JSON.stringify({
-					action: 'stream-segments',
+					action: 'stream_segments',
 					youtube_id: new URL(url).searchParams.get('v'),
 					segment_start_time: getCurrentTime()
 				})
 			);
-			socket.addEventListener('message', (event) => {
+			socket?.addEventListener('message', (event) => {
 				const data = JSON.parse(event.data);
 				if (data.action === 'stream_segments') {
 					captions = data.segment_text;
@@ -54,19 +64,12 @@
 			});
 		});
 	}
-
-	if (runCaptions) {
-		getCaptions();
-	}
 </script>
 
-<button on:click={getUrl}>Reveal url</button>
 <button on:click={activateCaptions}>Toggle captions</button>
-{#if url != ''}
-	<div>
-		Current url is {url}
-		{#if runCaptions}
-			<div>{captions}</div>
-		{/if}
-	</div>
-{/if}
+<div>
+	Current url is {url}
+	{#if runCaptions}
+		<div>captions activated:{captions}</div>
+	{/if}
+</div>
