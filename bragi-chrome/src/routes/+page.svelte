@@ -4,6 +4,11 @@
 	let captions = '';
 	let timerValue = '';
 	let socket: WebSocket | null = null;
+
+	const container = document.createElement('div');
+	const text = document.createElement('div');
+	container.appendChild(text);
+
 	async function getUrl() {
 		const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 		url = tab.url ?? '';
@@ -33,6 +38,7 @@
 	function getCurrentTime() {
 		return document.querySelector('video')?.currentTime;
 	}
+
 	async function getCaptions() {
 		if (!socket) {
 			socket = new WebSocket('ws://localhost:8000/ws');
@@ -41,7 +47,7 @@
 		document.querySelector('video')?.addEventListener('seeking', () => {
 			socket?.send(
 				JSON.stringify({
-					delay: 0,
+					delay: -0.15,
 					action: 'stream_segments',
 					youtube_id: new URL(url).searchParams.get('v'),
 					segment_start_time: getCurrentTime()
@@ -52,7 +58,7 @@
 		socket.addEventListener('open', () => {
 			socket?.send(
 				JSON.stringify({
-					delay: 0,
+					delay: -0.15,
 					action: 'stream_segments',
 					youtube_id: new URL(url).searchParams.get('v'),
 					segment_start_time: getCurrentTime()
