@@ -55,9 +55,11 @@ async def lifespan(app: FastAPI):
         
         CREATE TABLE IF NOT EXISTS videos (
             id INTEGER PRIMARY KEY,
+            name TEXT,
             youtube_id TEXT,
             custom_url TEXT,
-            state TEXT
+            state TEXT,
+            language TEXT
         );
         CREATE INDEX IF NOT EXISTS youtube_id_index ON videos (youtube_id);
         CREATE INDEX IF NOT EXISTS custom_url_index ON videos (custom_url);
@@ -68,6 +70,7 @@ async def lifespan(app: FastAPI):
             start_time INTEGER,
             end_time INTEGER,
             text TEXT,
+            language TEXT,
             FOREIGN KEY(video_id) REFERENCES videos(id)
         );
         CREATE INDEX IF NOT EXISTS video_id_index ON segments (video_id);
