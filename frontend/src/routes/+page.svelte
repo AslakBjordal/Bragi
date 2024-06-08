@@ -41,6 +41,7 @@
     if (res.error) {
       console.error('Error logging in:', res.error);
     } else {
+      localStorage.setItem('token', res.token);
       window.location.href = '/youtubetranscribe';
     }
   }

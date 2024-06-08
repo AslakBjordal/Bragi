@@ -24,17 +24,42 @@
   let transcribedText: string = 'Here will be the transcribed text...';
   let SRTFormat: string = 'dsadsadsadsadsasda';
 
-  function handleFileSelect(event: CustomEvent): void {
-    const files = event.detail.files as File[];
+  async function handleFileSelect(event: CustomEvent): void {
+    const files = event.detail as File[];
     uploadedFiles = [...uploadedFiles, ...files]; // Add new files to the existing list
-    if (files.length > 0) {
-      uploadedFile = files[0];
-      loadVideo(uploadedFile);
+    if (files.length === 0) {
+      return;
     }
-  }
-  function loadVideo(file: File): void {
-    const fileURL = URL.createObjectURL(file);
-    videoElement.src = fileURL;
+
+    if (files.length > 1) {
+      alert('Please select only one file at a time.');
+      return;
+    }
+
+    uploadedFile = files[0];
+
+    // Do form upload
+    const formData = new FormData();
+    formData.append('file', uploadedFile);
+
+    // Send the file to the server for transcription
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Please log in to transcribe files.');
+      return;
+    }
+
+    const res = await fetch('/api/file', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    const json = await res.json();
+
+    // Redirect to the transcription page
+    window.location.href = `/newcaption/${json.uuid}`;
   }
 
   function handleCopyText(): void {
@@ -84,41 +109,6 @@
     </SideNavItems>
   </SideNav>
 
-  <!-- Main content: Video Player and Transcription -->
-  <div class="content">
-    <div class="video-and-text">
-      <video bind:this={videoElement} controls class="video-player">
-        <track kind="captions" label="English" srcLang="en" src="" default />
-        <track kind="subtitles" label="English" srcLang="en" src="" />
-      </video>
-      <div class="transcription">
-        <Tabs>
-          <Tab label="Plain text" />
-          <Tab label="SRT format" />
-          <svelte:fragment slot="content">
-            <TabContent>
-              <TextArea
-                bind:value={transcribedText}
-                rows={10}
-                labelText="Transcribed Text"
-                class="textarea"
-              />
-              <Button icon={Copy} on:click={handleCopyText}>Copy Text</Button>
-            </TabContent>
-            <TabContent>
-              <TextArea
-                bind:value={SRTFormat}
-                rows={10}
-                labelText="Transcribed Text on SRT Format"
-                class="textarea"
-              />
-              <Button icon={Copy} on:click={handleCopySRT}>Copy Text</Button>
-            </TabContent>
-          </svelte:fragment>
-        </Tabs>
-      </div>
-    </div>
-  </div>
 </div>
 
 <style>

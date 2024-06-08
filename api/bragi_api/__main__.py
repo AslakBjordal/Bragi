@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from bragi_api import users
+from bragi_api import file, users
 from bragi_api.common import lock
 from bragi_api.server import router
 
@@ -87,6 +87,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
 app.include_router(users.router)
+app.include_router(file.router)
 
 
 def blocking_check(db: sqlite3.Connection, token: str) -> dict:

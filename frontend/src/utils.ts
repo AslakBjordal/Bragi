@@ -3,11 +3,17 @@ export async function sendRequest(
   path: string,
   body?: any
 ): Promise<any> {
+  const token = localStorage.getItem('token');
+  const headers: any = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`/api${path}`, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
 
