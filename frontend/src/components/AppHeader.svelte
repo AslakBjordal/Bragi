@@ -24,7 +24,7 @@
   }
 </script>
 
-<Header company="BRAGI">
+<Header company="BRAGI" href="/newcaption">
   <svelte:fragment slot="skip-to-content">
     <SkipToContent />
   </svelte:fragment>
