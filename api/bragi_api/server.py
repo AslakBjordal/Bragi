@@ -47,7 +47,7 @@ class WebsocketMessage(BaseModel):
 
     # Language
     language: Optional[str] = "en"
-    delay: Optional[int] = 0
+    delay: Optional[float] = 0
 
     # Stream segments
     segment_start_time: Optional[float] = None
