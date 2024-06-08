@@ -53,6 +53,7 @@ class WebsocketMessage(BaseModel):
     segment_start_time: Optional[float] = None
     segment_end_time: Optional[float] = None
     segment_text: Optional[str] = None
+    segment_stop: Optional[bool] = False
 
 
 async def ping(websocket: WebSocket):
@@ -202,6 +203,8 @@ async def start_transcription(websocket: WebSocket, data: WebsocketMessage):
 
 
 async def stream_segments(websocket: WebSocket, data: WebsocketMessage):
+    if data.segment_stop:
+        return
     # We pass off one segment at a time, if no segment is found
     # for time then we just block until a new segment is found
     current_time = data.segment_start_time

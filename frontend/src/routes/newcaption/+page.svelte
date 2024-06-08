@@ -1,21 +1,8 @@
-<script lang="ts">
+<script lang='ts'>
   import 'carbon-components-svelte/css/all.css';
-  import Logout from 'carbon-icons-svelte/lib/Logout.svelte';
-  import ArrowDownRight from 'carbon-icons-svelte/lib/ArrowDownRight.svelte';
-  import Copy from 'carbon-icons-svelte/lib/Copy.svelte';
-  import {
-    SideNav,
-    SideNavItems,
-    SideNavMenu,
-    SideNavMenuItem,
-    SideNavDivider,
-    FileUploaderButton,
-    Button,
-    TextArea,
-    Tabs,
-    Tab,
-    TabContent,
-  } from 'carbon-components-svelte';
+  import { FileUploaderButton } from 'carbon-components-svelte';
+  import { onMount } from 'svelte';
+  import { sendRequest } from '../../utils';
 
   let isSideNavOpen = false;
   let uploadedFiles: File[] = []; // Array to hold the uploaded files
@@ -23,6 +10,12 @@
   let uploadedFile: File | null = null;
   let transcribedText: string = 'Here will be the transcribed text...';
   let SRTFormat: string = 'dsadsadsadsadsasda';
+  let serverVideos = [];
+
+  onMount(async () => {
+    const res = await sendRequest('GET', '/videos');
+    serverVideos = res.videos;
+  });
 
   async function handleFileSelect(event: CustomEvent): void {
     const files = event.detail as File[];
@@ -52,9 +45,9 @@
     const res = await fetch('/api/file', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${token}`
       },
-      body: formData,
+      body: formData
     });
     const json = await res.json();
 
@@ -64,13 +57,14 @@
 
   function handleCopyText(): void {
     navigator.clipboard
-      .writeText(transcribedText)
-      .catch((err) => console.error('Failed to copy text: ', err));
+    .writeText(transcribedText)
+    .catch((err) => console.error('Failed to copy text: ', err));
   }
+
   function handleCopySRT(): void {
     navigator.clipboard
-      .writeText(SRTFormat)
-      .catch((err) => console.error('Failed to copy text: ', err));
+    .writeText(SRTFormat)
+    .catch((err) => console.error('Failed to copy text: ', err));
   }
 
   function handleLogout(): void {
@@ -80,41 +74,26 @@
   }
 </script>
 
-<div class="main-container">
-  <!-- Sidebar -->
-  <SideNav bind:isOpen={isSideNavOpen} rail class="sidebar">
-    <SideNavItems>
-      <FileUploaderButton
-        on:change={handleFileSelect}
-        labelText="Add file"
-        accept={['.mp3', '.mp4']}
-      />
-      <SideNavDivider />
-      <SideNavMenu icon={ArrowDownRight} text="Your files">
-        {#each uploadedFiles as file (file.name)}
-          <SideNavMenuItem text={file.name} />
-        {/each}
-      </SideNavMenu>
-      <SideNavDivider />
-      <!-- Logout button at the bottom of the SideNav -->
-      <Button
-        kind="danger-tertiary"
-        class="logout-button"
-        on:click={handleLogout}
-        icon={Logout}
-        iconDescription="Log out"
-      >
-        Log out
-      </Button>
-    </SideNavItems>
-  </SideNav>
-
+<div class='main-container'>
+  <div class='content'>
+    <FileUploaderButton
+      on:change={handleFileSelect}
+      labelText='Add file'
+      accept={['.mp3', '.mp4']}
+    />
+    <div class="files">
+      <h1>Your files</h1>
+      {#each serverVideos as video}
+        <a href="/newcaption/{video.custom_url}">{video.name}</a>
+      {/each}
+    </div>
+  </div>
 </div>
 
 <style>
   .main-container {
-    display: flex;
-    height: 100vh;
+    margin-top: 3rem;
+    padding: 0;
   }
 
   :global(.logout-button) {
@@ -124,12 +103,20 @@
   }
 
   .content {
-    flex: 1;
-    padding: 2rem;
+    row-gap: 1rem;
+    gap: 1rem;
+  }
+
+  .files {
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
     gap: 1rem;
+    margin-top: 1rem;
+
+    & > a {
+      text-decoration: none;
+      color: var(--cds-interactive-04);
+    }
   }
 
   .video-and-text {

@@ -5,6 +5,7 @@
   import { Button, Tab, TabContent, Tabs, TextArea } from 'carbon-components-svelte';
 
   let segments = '';
+  let socket: WebSocket | null = null;
 
   onMount(async () => {
     const customURL = $page.params.id;
@@ -14,9 +15,9 @@
       return;
     }
 
-    const socket = new WebSocket('ws://localhost:5173/ws');
+    socket = new WebSocket('ws://localhost:5173/ws');
     socket.addEventListener('open', () => {
-      socket.send(JSON.stringify({
+      socket?.send(JSON.stringify({
         action: 'stream_segments',
         'custom_url': customURL
       }));
@@ -29,6 +30,34 @@
       }
     });
   });
+
+  function onSeek(event) {
+    segments = '';
+    socket?.send(JSON.stringify({
+      action: 'stream_segments',
+      custom_url: $page.params.id,
+      segment_start_time: event.target.currentTime,
+      segment_stop: event.target.paused,
+    }));
+  }
+
+  function onPause(event) {
+    socket?.send(JSON.stringify({
+      action: 'stream_segments',
+      custom_url: $page.params.id,
+      segment_stop: true,
+    }));
+  }
+
+  function onPlay(event) {
+    segments = '';
+    socket?.send(JSON.stringify({
+      action: 'stream_segments',
+      custom_url: $page.params.id,
+      segment_start: true,
+      segment_start_time: event.target.currentTime,
+    }));
+  }
 </script>
 
 <style>
@@ -57,7 +86,7 @@
 <div class='main-container'>
   <!-- Main content: Video Player and Transcription -->
   <div class='content'>
-    <video controls class='video-player' autoplay>
+    <video on:seeking={onSeek} on:pause={onPause} on:play={onPlay} controls class='video-player' autoplay>
       <track kind='captions' label='English' srcLang='en' src='' default />
       <track kind='subtitles' label='English' srcLang='en' src='' />
       <source src="/api/videos/{$page.params.id}/stream" type="video/mp4">

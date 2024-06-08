@@ -4,6 +4,8 @@ import uuid
 from fastapi import APIRouter, UploadFile, Request, Header
 from fastapi.responses import Response
 
+from bragi_api.common import lock
+
 router = APIRouter()
 
 
@@ -17,7 +19,27 @@ async def upload_file(req: Request, file: UploadFile):
     with open(final_path, "wb") as f:
         f.write(await file.read())
 
+    db = req.app.db
+    lock.acquire()
+    cur = db.cursor()
+    cur.execute(
+        "INSERT INTO videos (name, custom_url, state, language) VALUES (?, ?, 'idle', 'en')",
+        (file.filename, new_uuid,))
+    db.commit()
+    lock.release()
+
     return {"uuid": new_uuid}
+
+
+@router.get("/videos")
+async def get_videos(req: Request):
+    db = req.app.db
+    cur = db.cursor()
+    cur.execute("SELECT * FROM videos")
+    rows = cur.fetchall()
+    return {"videos": [
+        {"id": row[0], "name": row[1], "custom_url": row[3], "state": row[4]}
+        for row in rows]}
 
 
 @router.get("/videos/{custom_url}/stream")
