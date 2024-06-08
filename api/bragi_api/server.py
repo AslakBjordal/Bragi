@@ -47,6 +47,7 @@ class WebsocketMessage(BaseModel):
 
     # Language
     language: Optional[str] = "en"
+    delay: Optional[int] = 0
 
     # Stream segments
     segment_start_time: Optional[float] = None
@@ -245,6 +246,8 @@ async def stream_segments(websocket: WebSocket, data: WebsocketMessage):
             time_to_sleep = row[1] - row[0]
             if current_time < row[1]:
                 time_to_sleep += row[0] - current_time
+            if data.delay:
+                time_to_sleep += data.delay
 
             current_time = row[1]
             await asyncio.sleep(time_to_sleep)
