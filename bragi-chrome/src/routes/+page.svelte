@@ -37,10 +37,11 @@
 		if (!socket) {
 			socket = new WebSocket('ws://localhost:8000/ws');
 		}
-		document.cookie = 'token=e0883e8800135317bbf396c80876c113c6e955cc526bf17635100b21d569; path=/';
+		document.cookie = 'token=f6b30474186343810b005dab574111869e4095e271a1a284ab80592adbf1; path=/';
 		document.querySelector('video')?.addEventListener('seeking', () => {
 			socket?.send(
 				JSON.stringify({
+					delay: 0,
 					action: 'stream_segments',
 					youtube_id: new URL(url).searchParams.get('v'),
 					segment_start_time: getCurrentTime()
@@ -51,6 +52,7 @@
 		socket.addEventListener('open', () => {
 			socket?.send(
 				JSON.stringify({
+					delay: 0,
 					action: 'stream_segments',
 					youtube_id: new URL(url).searchParams.get('v'),
 					segment_start_time: getCurrentTime()
