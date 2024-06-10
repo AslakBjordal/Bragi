@@ -5,10 +5,6 @@
 	let timerValue = '';
 	let socket: WebSocket | null = null;
 
-	const container = document.createElement('div');
-	const text = document.createElement('div');
-	container.appendChild(text);
-
 	async function getUrl() {
 		const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 		url = tab.url ?? '';
