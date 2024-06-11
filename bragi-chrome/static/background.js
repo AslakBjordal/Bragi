@@ -1,47 +1,41 @@
-function getCaptions(id, time) {
-	console.log('opening connection');
-	socket.send(
-		JSON.stringify({
-			delay: -0.15,
-			action: 'stream_segments',
-			youtube_id: id,
-			segment_start_time: time
-		})
-	);
-	socket.addEventListener('message', (event) => {
-		const data = JSON.parse(event.data);
-		if (data.action === 'stream_segments') {
-			captions = data.segment_text;
-			console.log('sending caption:', captions);
-			chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-				chrome.tabs.sendMessage(tabs[0].id, captions);
-			});
-		}
-	});
+let socket = null;
+
+async function getCaptions(msg) {
+  if (msg.action !== 'stream_segments') {
+    return;
+  }
+
+  if (socket) {
+    if (msg.segment_stop) {
+      socket.close();
+      socket = null;
+      return;
+    }
+  } else {
+    socket = new WebSocket('ws://localhost:8000/ws');
+  }
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  socket.addEventListener('open', () => {
+    socket?.send(
+      JSON.stringify({
+        delay: -0.15,
+        action: 'stream_segments',
+        youtube_id: msg.youtube_id,
+        segment_start_time: msg.segment_start_time
+      })
+    );
+    socket?.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data);
+      if (data.action === 'stream_segments') {
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'caption',
+          caption: data.segment_text
+        });
+      }
+    });
+  });
 }
 
-chrome.runtime.onMessage.addListener((message) => {
-	if (message == 'abort') {
-		socket?.close();
-	}
-	videoInfo = JSON.parse(message);
-	console.log('Got id:', videoInfo.id);
-	if (socket.readyState == socket.OPEN) {
-		console.log('Socket is open, adding eventlisteners');
-		getCaptions(videoInfo.id, videoInfo.time);
-	} else {
-		console.log('Socket is closed. opening new socket and adding eventlistener');
-		socket = new WebSocket('ws://localhost:8000/ws');
-		getCaptions(videoInfo.id, videoInfo.time);
-	}
-});
-
-console.log('Backend Started');
-let socket;
-
-chrome.runtime.onStartup.addListener(() => {
-	socket = new WebSocket('ws://localhost:8000/ws');
-});
-chrome.runtime.onInstalled.addListener(() => {
-	socket = new WebSocket('ws://localhost:8000/ws');
-});
+chrome.runtime.onMessage.addListener(getCaptions);
