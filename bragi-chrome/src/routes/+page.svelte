@@ -39,9 +39,3 @@
 </script>
 
 <button on:click={activateCaptions}>Toggle captions</button>
-<div>
-  Current url is {url}
-  {#if runCaptions}
-    <div>captions activated:{captions}</div>
-  {/if}
-</div>

@@ -1,6 +1,8 @@
 const video = document.querySelector('video');
 let enabled = false;
 
+const delay = 0;
+
 async function sendNewMessage(message) {
   await chrome.runtime.sendMessage(message);
 }
@@ -25,7 +27,7 @@ chrome.runtime.onMessage.addListener((message) => {
       destroyOverlay();
     }
     sendNewMessage({
-      delay: -0.15,
+      delay: delay,
       action: 'stream_segments',
       youtube_id: new URL(document.location.href).searchParams.get('v'),
       segment_stop: !enabled,
@@ -82,10 +84,13 @@ video?.addEventListener('seeking', (evt) => {
     destroyOverlay();
     return;
   }
+  if (!enabled) {
+    return;
+  }
   createOverlay();
 
   sendNewMessage({
-    delay: -0.15,
+    delay: delay,
     action: 'stream_segments',
     youtube_id: new URL(document.location.href).searchParams.get('v'),
     segment_start_time: target.currentTime,
@@ -105,9 +110,12 @@ video?.addEventListener('pause', (evt) => {
 
 video?.addEventListener('play', (evt) => {
   const target = evt.target;
+  if (!enabled) {
+    return;
+  }
   createOverlay();
   sendNewMessage({
-    delay: -0.15,
+    delay: delay,
     action: 'stream_segments',
     youtube_id: new URL(url).searchParams.get('v'),
     segment_start_time: target.currentTime,

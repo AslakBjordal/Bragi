@@ -18,14 +18,7 @@ async function getCaptions(msg) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   socket.addEventListener('open', () => {
-    socket?.send(
-      JSON.stringify({
-        delay: -0.15,
-        action: 'stream_segments',
-        youtube_id: msg.youtube_id,
-        segment_start_time: msg.segment_start_time
-      })
-    );
+    socket?.send(JSON.stringify(msg));
     socket?.addEventListener('message', (event) => {
       const data = JSON.parse(event.data);
       if (data.action === 'stream_segments') {
