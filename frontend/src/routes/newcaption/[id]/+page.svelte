@@ -5,6 +5,7 @@
   import { Button, Tab, TabContent, Tabs, TextArea } from 'carbon-components-svelte';
 
   let segments = '';
+  let srtSegments = '';
   let socket: WebSocket | null = null;
 
   onMount(async () => {
@@ -19,7 +20,8 @@
     socket.addEventListener('open', () => {
       socket?.send(JSON.stringify({
         action: 'stream_segments',
-        'custom_url': customURL
+        'custom_url': customURL,
+        language: $page.url.searchParams.get('lang') || 'en',
       }));
     });
 
@@ -27,6 +29,7 @@
       const data = JSON.parse(event.data);
       if (data.action === 'stream_segments') {
         segments += `${data.segment_start_time}: ${data.segment_text}\n`;
+        srtSegments += data.segment_srt;
       }
     });
   });
@@ -38,6 +41,7 @@
       custom_url: $page.params.id,
       segment_start_time: event.target.currentTime,
       segment_stop: event.target.paused,
+      language: $page.url.searchParams.get('lang') || 'en',
     }));
   }
 
@@ -46,6 +50,7 @@
       action: 'stream_segments',
       custom_url: $page.params.id,
       segment_stop: true,
+      language: $page.url.searchParams.get('lang') || 'en',
     }));
   }
 
@@ -54,8 +59,9 @@
     socket?.send(JSON.stringify({
       action: 'stream_segments',
       custom_url: $page.params.id,
-      segment_start: true,
+      segment_stop: false,
       segment_start_time: event.target.currentTime,
+      language: $page.url.searchParams.get('lang') || 'en',
     }));
   }
 </script>
@@ -108,9 +114,11 @@
           </TabContent>
           <TabContent>
               <TextArea
-                rows={10}
+                rows={30}
                 labelText='Transcribed Text on SRT Format'
                 class='textarea'
+                disabled
+                bind:value={srtSegments}
               />
             <Button icon={Copy}>Copy Text</Button>
           </TabContent>
