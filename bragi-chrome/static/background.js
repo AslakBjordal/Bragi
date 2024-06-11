@@ -1,11 +1,11 @@
-function getCaptions(id) {
+function getCaptions(id, time) {
 	console.log('opening connection');
 	socket.send(
 		JSON.stringify({
 			delay: -0.15,
 			action: 'stream_segments',
 			youtube_id: id,
-			segment_start_time: 0
+			segment_start_time: time
 		})
 	);
 	socket.addEventListener('message', (event) => {
@@ -20,17 +20,28 @@ function getCaptions(id) {
 	});
 }
 
-chrome.runtime.onMessage.addListener((id) => {
-	console.log('Got id:', id);
+chrome.runtime.onMessage.addListener((message) => {
+	if (message == 'abort') {
+		socket?.close();
+	}
+	videoInfo = JSON.parse(message);
+	console.log('Got id:', videoInfo.id);
 	if (socket.readyState == socket.OPEN) {
 		console.log('Socket is open, adding eventlisteners');
-		getCaptions(id);
+		getCaptions(videoInfo.id, videoInfo.time);
 	} else {
 		console.log('Socket is closed. opening new socket and adding eventlistener');
 		socket = new WebSocket('ws://localhost:8000/ws');
-		getCaptions(id);
+		getCaptions(videoInfo.id, videoInfo.time);
 	}
 });
 
 console.log('Backend Started');
-let socket = new WebSocket('ws://localhost:8000/ws');
+let socket;
+
+chrome.runtime.onStartup.addListener(() => {
+	socket = new WebSocket('ws://localhost:8000/ws');
+});
+chrome.runtime.onInstalled.addListener(() => {
+	socket = new WebSocket('ws://localhost:8000/ws');
+});
