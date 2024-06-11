@@ -1,6 +1,6 @@
 <script lang='ts'>
   import 'carbon-components-svelte/css/all.css';
-  import { FileUploaderButton } from 'carbon-components-svelte';
+  import { Dropdown, FileUploaderButton } from 'carbon-components-svelte';
   import { onMount } from 'svelte';
   import { sendRequest } from '../../utils';
 
@@ -11,6 +11,7 @@
   let transcribedText: string = 'Here will be the transcribed text...';
   let SRTFormat: string = 'dsadsadsadsadsasda';
   let serverVideos = [];
+  let selectedLanguage = 'en';
 
   onMount(async () => {
     const res = await sendRequest('GET', '/videos');
@@ -52,7 +53,7 @@
     const json = await res.json();
 
     // Redirect to the transcription page
-    window.location.href = `/newcaption/${json.uuid}`;
+    window.location.href = `/newcaption/${json.uuid}?lang=${selectedLanguage}`;
   }
 
   function handleCopyText(): void {
@@ -81,10 +82,41 @@
       labelText='Add file'
       accept={['.mp3', '.mp4']}
     />
-    <div class="files">
+    <Dropdown
+      selectedId={selectedLanguage}
+      on:select={ (event) => selectedLanguage = event.detail.selectedItem.id }
+      titleText='Language'
+      items={[
+        {
+          text: 'English',
+          id: 'en'
+        },
+        {
+          text: 'Spanish',
+          id: 'es'
+        },
+        {
+          text: 'French',
+          id: 'fr'
+        },
+        {
+          text: 'Norwegian',
+          id: 'no'
+        },
+        {
+          text: 'Turkish',
+          id: 'tr'
+        },
+        {
+          text: 'Swedish',
+          id: 'sv'
+        }
+      ]}
+    />
+    <div class='files'>
       <h1>Your files</h1>
       {#each serverVideos as video}
-        <a href="/newcaption/{video.custom_url}">{video.name}</a>
+        <a href='/newcaption/{video.custom_url}'>{video.name}</a>
       {/each}
     </div>
   </div>

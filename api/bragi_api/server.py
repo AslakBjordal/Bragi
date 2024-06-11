@@ -53,6 +53,7 @@ class WebsocketMessage(BaseModel):
     segment_start_time: Optional[float] = None
     segment_end_time: Optional[float] = None
     segment_text: Optional[str] = None
+    segment_srt: Optional[str] = None
     segment_stop: Optional[bool] = False
 
 
@@ -136,8 +137,8 @@ async def start_transcription(websocket: WebSocket, data: WebsocketMessage):
     while True:
         cur = websocket.app.db.cursor()
         cur.execute(
-            "SELECT state FROM videos WHERE youtube_id = ? OR custom_url = ?",
-            (data.youtube_id, data.custom_url))
+            "SELECT state FROM videos WHERE (youtube_id = ? OR custom_url = ?) AND language = ?",
+            (data.youtube_id, data.custom_url, data.language))
         row = cur.fetchone()
 
         # If success, then we already have the segments
@@ -201,6 +202,12 @@ async def start_transcription(websocket: WebSocket, data: WebsocketMessage):
                          custom_url=data.custom_url,
                          language=data.language).dict(exclude_none=True))
 
+def format_time_srt(seconds):
+    # Converts time in seconds to SRT format.
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds = seconds % 60
+    return f'{hours:02}:{minutes:02}:{seconds:06.3f}'.replace('.', ',')
 
 async def stream_segments(websocket: WebSocket, data: WebsocketMessage):
     if data.segment_stop:
@@ -239,11 +246,17 @@ async def stream_segments(websocket: WebSocket, data: WebsocketMessage):
             (video_id, current_time, data.language))
         row = cur.fetchone()
         if row:
+            srt_start = format_time_srt(row[0])
+            srt_end = format_time_srt(row[1])
+            srt_content = row[2].replace('\n', ' ').strip()
+            srt_text = f"{srt_start} --> {srt_end}\n{srt_content}\n\n"
+
             await websocket.send_json(
                 WebsocketMessage(action=Action.STREAM_SEGMENTS,
                                  segment_start_time=row[0],
                                  segment_end_time=row[1],
-                                 segment_text=row[2]).dict(exclude_none=True))
+                                 segment_text=row[2],
+                                 segment_srt=srt_text).dict(exclude_none=True))
             # Sleep the duration of the segment, account for the start_time duration.
             # Sometimes we can be given a 0 start time while the segment starts at a later time.
             time_to_sleep = row[1] - row[0]
