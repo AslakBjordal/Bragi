@@ -220,10 +220,10 @@ async def stream_segments(websocket: WebSocket, data: WebsocketMessage):
 
     # Check if a video id is present
     cur = websocket.app.db.cursor()
-    cur.execute("SELECT id FROM videos WHERE (youtube_id = ? OR custom_url = ?) AND language = ?",
+    cur.execute("SELECT id, state FROM videos WHERE (youtube_id = ? OR custom_url = ?) AND language = ?",
                 (data.youtube_id, data.custom_url, data.language))
     row = cur.fetchone()
-    if not row:
+    if not row or State(row[1]) == State.IDLE:
         asyncio.ensure_future(start_transcription(websocket, data))
         while True:
             cur.execute(
